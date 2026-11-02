@@ -1,0 +1,755 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DevOps and Code Management — Interactive Slides</title>
+<style>
+:root{--paper:#F6F3EC;--card:#FFFDF8;--ink:#14202C;--muted:#556170;--line:#CFC6B3;--soft:#ECE6D8;
+--teal:#0E7A6F;--teal-s:#D8EFE9;--orange:#C2560B;--orange-s:#FBE6D2;--blue:#1F4FD1;--blue-s:#E0E8FD;--violet:#5B3FB0;--violet-s:#ECE5FA;--green:#18803D;--green-s:#DCF3E2;
+--sans:"Segoe UI",-apple-system,BlinkMacSystemFont,Inter,Roboto,"Helvetica Neue",Arial,sans-serif;--mono:ui-monospace,"SF Mono",Menlo,Consolas,"Liberation Mono",monospace}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:#0d151d;overflow:hidden;font-family:var(--sans);color:var(--ink)}
+#viewport{position:fixed;inset:0}
+#stage{position:absolute;left:50%;top:50%;width:1920px;height:1080px;transform-origin:center center;background:var(--paper);overflow:hidden;box-shadow:0 30px 80px rgba(0,0,0,.5)}
+.slide{position:absolute;inset:0;opacity:0;pointer-events:none;transform:translateX(60px);transition:opacity .45s ease,transform .45s ease}
+.slide.cur{opacity:1;pointer-events:auto;transform:none}
+.slide.past{transform:translateX(-60px)}
+.kick{position:absolute;left:100px;top:66px;font-family:var(--mono);font-size:24px;letter-spacing:.14em;text-transform:uppercase;color:var(--teal)}
+.ttl{position:absolute;left:100px;top:100px;font-size:60px;font-weight:700;letter-spacing:-.01em;margin:0;line-height:1.1}
+.sub-ttl{position:absolute;left:100px;top:180px;font-size:30px;color:var(--muted)}
+.dark{background:var(--ink);color:var(--paper)}
+
+/* caption bar */
+.capbar{position:absolute;left:100px;right:100px;top:938px;height:96px;display:flex;align-items:center;gap:26px;border-top:2px solid var(--soft)}
+.capnum{font-family:var(--mono);font-size:26px;font-weight:700;background:var(--ink);color:#fff;border-radius:12px;padding:8px 16px;white-space:nowrap}
+.capnum.idle{background:var(--soft);color:var(--muted)}
+.captext{font-size:38px;font-weight:600;line-height:1.2;flex:1}
+.captext.hint{font-weight:400;color:var(--muted);font-size:32px}
+.captext.pop{animation:capin .4s ease}
+@keyframes capin{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+.sdots{display:flex;gap:10px}
+.sdots i{width:14px;height:14px;border-radius:50%;background:#d8d0bf}
+.sdots i.d{background:var(--teal)}.sdots i.c{background:var(--ink);transform:scale(1.3)}
+.capall{display:none}
+
+/* diagram */
+svg.wires{position:absolute;inset:0;width:1920px;height:1080px;overflow:visible;pointer-events:none}
+.arr{fill:none;stroke-width:6;stroke-linecap:round;stroke-linejoin:round;opacity:0;transition:opacity .25s}
+.arr.on{opacity:1}
+.arr.base{stroke:#C3B9A4;stroke-width:4;stroke-dasharray:10 10;opacity:1}
+.arr.live{stroke-dasharray:18 12!important;animation:flow .8s linear infinite}
+@keyframes flow{to{stroke-dashoffset:-30}}
+.alab{font-family:var(--mono);font-size:24px;font-weight:700;paint-order:stroke;stroke:var(--paper);stroke-width:8px;opacity:0;transition:opacity .3s}
+.alab.on{opacity:1}
+.node{position:absolute;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;background:var(--card);border:3px solid var(--line);border-radius:20px;padding:10px 14px;transition:all .4s ease;z-index:2}
+.node .t{font-size:30px;font-weight:700;line-height:1.15}
+.node .s{font-size:23px;color:var(--muted);margin-top:6px;line-height:1.2;min-height:1px}
+.node .ic{font-size:40px;line-height:1;margin-bottom:4px}
+.node.on{border-color:var(--blue);box-shadow:0 0 0 8px var(--blue-s);transform:scale(1.05)}
+.node.ok{border-color:var(--green);background:#F3FBF5;box-shadow:0 0 0 8px var(--green-s)}
+.node.fail{border-color:var(--orange);background:#FFF6EE;box-shadow:0 0 0 8px var(--orange-s);animation:shake .45s}
+.node.warn{border-color:var(--orange);box-shadow:0 0 0 8px var(--orange-s)}
+.node.dim{opacity:.3}
+.node.darkn{background:var(--ink);border-color:var(--ink)}.node.darkn .t{color:#fff}.node.darkn .s{color:#BFD0CC}
+.node.dot{border-radius:50%;padding:0;border:0;color:#fff;font-family:var(--mono)}
+.node.dot .t{font-size:26px}
+.dot.ink{background:var(--ink)}.dot.violet{background:var(--violet)}.dot.amber{background:var(--orange)}.dot.teal{background:var(--teal)}.dot.grey{background:#9aa3ad}
+.rv{opacity:0;transform:scale(.6)}
+.rv.shown{opacity:1;transform:none}
+.node.rv.shown.on{transform:scale(1.05)}
+@keyframes shake{0%,100%{translate:0}25%{translate:-8px}75%{translate:8px}}
+.tok{position:absolute;transform:translate(-50%,-50%);z-index:6;font-family:var(--mono);font-size:24px;font-weight:700;color:#fff;background:var(--ink);border-radius:999px;padding:8px 18px;white-space:nowrap;box-shadow:0 10px 20px -8px rgba(0,0,0,.5);transition:left .6s cubic-bezier(.6,.05,.3,1),top .6s cubic-bezier(.6,.05,.3,1),opacity .3s,background .3s;opacity:0}
+.tok.vis{opacity:1}
+.tok.red{background:var(--orange)}.tok.green{background:var(--green)}.tok.blue{background:var(--blue)}.tok.teal{background:var(--teal)}.tok.violet{background:var(--violet)}
+.group{position:absolute;border:4px dashed var(--teal);border-radius:28px;background:rgba(14,122,111,.04);z-index:1}
+.group span{position:absolute;top:-20px;left:28px;background:var(--paper);padding:0 12px;font-family:var(--mono);font-size:24px;font-weight:700;color:var(--teal);letter-spacing:.1em;text-transform:uppercase}
+.group.og{border-color:var(--orange);background:rgba(194,86,11,.04)}.group.og span{color:var(--orange)}
+.badge{position:absolute;right:100px;top:118px;font-family:var(--mono);font-size:28px;font-weight:700;background:#fff;border:3px solid var(--line);border-radius:999px;padding:10px 24px;transition:all .3s}
+.badge.bad{background:var(--orange-s);border-color:var(--orange);color:#7a3305}
+.badge.good{background:var(--green-s);border-color:var(--green);color:#0d5426}
+.lane{position:absolute;font-family:var(--mono);font-size:28px;font-weight:700}
+.instant,.instant *{transition:none!important}
+
+/* flip cards */
+.fc{position:absolute;perspective:1600px;cursor:pointer}
+.fc .in{position:absolute;inset:0;transition:transform .6s cubic-bezier(.4,.2,.2,1);transform-style:preserve-3d}
+.fc.open .in{transform:rotateY(180deg)}
+.fc .f,.fc .b{position:absolute;inset:0;backface-visibility:hidden;border-radius:26px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:30px}
+.fc .f{background:var(--card);border:3px solid var(--line)}
+.fc .f .ic{font-size:96px;line-height:1}
+.fc .f .t{font-size:40px;font-weight:700;margin-top:18px;line-height:1.15}
+.fc .f .h{position:absolute;bottom:22px;font-family:var(--mono);font-size:22px;color:var(--muted)}
+.fc .b{background:var(--teal);color:#fff;transform:rotateY(180deg)}
+.fc .b .t{font-size:30px;font-weight:700;opacity:.85;line-height:1.2}
+.fc .b .d{font-size:38px;font-weight:600;line-height:1.25;margin-top:16px}
+.fc:hover .f{border-color:var(--ink)}
+
+/* reveal tiles */
+.tile{position:absolute;background:var(--card);border:3px solid var(--line);border-radius:24px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:20px;transition:all .45s cubic-bezier(.2,1.4,.4,1)}
+.tile .ic{font-size:64px}.tile .big{font-size:70px;font-weight:800;color:var(--teal);line-height:1}
+.tile .t{font-size:32px;font-weight:700;margin-top:10px;line-height:1.2}
+.banner{position:absolute;left:100px;right:100px;top:800px;text-align:center;font-size:40px;font-weight:700;color:#fff;background:var(--teal);border-radius:20px;padding:22px;transition:all .45s}
+
+/* HUD */
+#hud{position:fixed;left:0;right:0;bottom:0;display:flex;align-items:center;gap:10px;padding:10px 16px;z-index:50;opacity:.25;transition:opacity .3s}
+#hud:hover{opacity:1}
+#hud button{background:#22303d;color:#fff;border:0;border-radius:8px;padding:8px 14px;font:14px var(--sans);cursor:pointer}
+#hud button:hover{background:#34495c}
+#hud .ct{color:#c9d4dc;font:13px var(--mono);margin-left:auto}
+#bar{position:fixed;left:0;top:0;height:4px;background:var(--teal);z-index:60;transition:width .3s}
+#toast{position:fixed;right:20px;bottom:60px;max-width:380px;background:#fff;color:var(--ink);border-radius:12px;padding:14px 16px;font:15px/1.4 var(--sans);box-shadow:0 12px 30px rgba(0,0,0,.4);display:none;z-index:70}
+
+/* interactive widgets (inside stage) */
+.int{cursor:auto}
+.btn{font:600 24px var(--sans);border:3px solid var(--line);background:#fff;color:var(--ink);border-radius:14px;padding:12px 22px;cursor:pointer}
+.btn:hover{border-color:var(--ink)}
+.btn.pri{background:var(--ink);color:#fff;border-color:var(--ink)}
+.btn.or{background:var(--orange);color:#fff;border-color:var(--orange)}
+.btn.tl{background:var(--teal);color:#fff;border-color:var(--teal)}
+.repo{position:absolute;background:var(--card);border:3px solid var(--line);border-radius:24px;padding:24px;transition:all .3s}
+.repo.flash{border-color:var(--teal);box-shadow:0 0 0 8px var(--teal-s)}
+.repo.err{border-color:var(--orange);box-shadow:0 0 0 8px var(--orange-s);animation:shake .4s}
+.repo h4{margin:0;font-size:32px}
+.repo .chain{display:flex;flex-wrap:wrap;gap:10px;min-height:60px;margin:22px 0;align-items:center}
+.chip{font:700 22px var(--mono);color:#fff;border-radius:10px;padding:8px 12px;animation:pop .4s cubic-bezier(.2,1.6,.4,1)}
+.chip.c0{background:#6b7480}.chip.A{background:var(--violet)}.chip.B{background:var(--orange)}.chip.M{background:var(--teal)}
+@keyframes pop{from{transform:scale(.2);opacity:0}to{transform:none;opacity:1}}
+.repo .acts{display:flex;gap:10px;flex-wrap:wrap}
+.dead{font:700 26px var(--mono);color:var(--orange);min-height:60px;margin:22px 0;display:flex;align-items:center}
+.glog{position:absolute;left:100px;right:100px;top:790px;height:130px;background:#101820;color:#d6efe7;border-radius:18px;font:24px/1.5 var(--mono);padding:14px 22px;overflow:hidden}
+.glog .r{color:#ffb37a}.glog .g{color:#7be3a9}
+.fly{position:absolute;z-index:20;transition:left .6s cubic-bezier(.6,.05,.3,1),top .6s cubic-bezier(.6,.05,.3,1)}
+.file{position:absolute;background:var(--card);border:3px solid var(--line);border-radius:20px;padding:18px;text-align:center;transition:all .35s}
+.file .n{font:700 26px var(--mono)}.file .ts{font:700 52px var(--mono);margin-top:8px}
+.file.new{border-color:var(--orange);box-shadow:0 0 0 8px var(--orange-s)}
+.file.old{border-color:var(--green)}
+.file.re{border-color:var(--teal);box-shadow:0 0 0 8px var(--teal-s);animation:pop .5s}
+.file .ed{position:absolute;top:10px;right:10px;font-size:22px;padding:4px 10px}
+.verdict{position:absolute;left:100px;right:100px;top:800px;font-size:36px;font-weight:700;text-align:center;border-radius:20px;padding:22px;background:var(--soft)}
+.verdict.ok{background:var(--green-s);color:#0d5426}.verdict.re{background:var(--orange-s);color:#7a3305}
+.pick button{font:700 28px var(--sans);width:70px;height:56px;border-radius:12px;border:3px solid var(--line);background:#fff;cursor:pointer;margin-left:6px}
+.pick button.sel{background:var(--ink);color:#fff;border-color:var(--ink)}
+.pick button.right{background:var(--green);border-color:var(--green);color:#fff}
+.pick button.wrong{background:var(--orange);border-color:var(--orange);color:#fff}
+.mrow{display:flex;align-items:center;justify-content:space-between;font-size:30px;padding:12px 0;border-bottom:2px solid var(--soft)}
+.qcard{position:absolute;background:var(--card);border:3px solid var(--line);border-radius:24px;padding:26px}
+.qcard h4{margin:0 0 16px;font-size:32px;line-height:1.2}
+.qcard .o{display:block;width:100%;text-align:left;font:26px var(--sans);border:3px solid var(--line);background:#fff;border-radius:14px;padding:12px 16px;margin-top:10px;cursor:pointer;color:var(--ink)}
+.qcard .o.right{background:var(--green-s);border-color:var(--green)}.qcard .o.wrong{background:var(--orange-s);border-color:var(--orange)}
+.qcard .o:disabled{cursor:default}
+
+/* print */
+@page{size:1920px 1080px;margin:0}
+@media print{
+  html,body{overflow:visible;height:auto;background:#fff}
+  #hud,#bar,#toast{display:none!important}
+  #viewport{position:static}
+  #stage{position:static;transform:none!important;width:1920px;height:auto;box-shadow:none;overflow:visible;background:none}
+  .slide{position:relative;opacity:1!important;transform:none!important;width:1920px;height:1080px;break-after:page;overflow:hidden;background:var(--paper)}
+  .slide.dark{background:var(--ink)}
+  .arr.live{animation:none;stroke-dasharray:none!important}
+  .capbar .captext,.capbar .capnum,.capbar .sdots{display:none}
+  .capall{display:block;columns:2;column-gap:60px;font-size:22px;line-height:1.35;margin:0;padding-left:34px;width:100%}
+  .capall li{break-inside:avoid}
+  *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+<div id="viewport"><div id="stage"></div></div>
+<div id="hud">
+  <button id="bPrev">◀</button><button id="bNext">Next ▶</button>
+  <button id="bFull">⛶ Fullscreen</button><button id="bPdf">⤓ PDF</button>
+  <span class="ct" id="ct"></span>
+</div>
+<div id="toast"></div>
+
+<script>
+/* =====================================================================
+   SLIDE CONTENT
+   ===================================================================== */
+const S = [];
+
+/* ---------- 1 cover ---------- */
+S.push({kind:'cover'});
+
+/* ---------- 2 traditional (Fig 10.1) ---------- */
+S.push({kind:'diagram', kick:'Software support · Fig 10.1', title:'The traditional way: three teams',
+ nodes:{dev:[170,330,330,150,'Development team','',  '👩‍💻'], rel:[795,330,330,150,'Release team','build · test · document','📦'], cust:[1420,330,330,150,'Customers','','👥'],
+        sup:[1420,650,330,150,'Support team','','🎧'], mnt:[795,650,330,150,'Maintenance team','or original devs','🛠']},
+ arrows:[{a:'dev',b:'rel',s:2},{a:'rel',b:'cust',s:3},{a:'cust',b:'sup',s:5,c:'orange'},{a:'sup',b:'mnt',s:6,c:'orange'},{a:'mnt',b:'dev',s:6,c:'orange',via:[[335,725]]}],
+ tokens:[{l:'v1.0',c:'blue',p:{1:'dev',2:'rel',3:'cust'}},
+         {l:'🐞 bug',c:'red',p:{4:'cust',5:'sup',6:'mnt',7:['dev','rel','cust']},lb:{7:'🔧 fix'},cl:{7:'green'},dy:{4:95,5:95,6:95,7:-95}}],
+ st:{1:{dev:'on'},2:{dev:'',rel:'on'},3:{rel:'',cust:'ok'},4:{cust:'fail'},5:{sup:'warn'},6:{sup:'',mnt:'warn'},7:{mnt:'',cust:'ok'}},
+ badge:{1:'Handoffs: 0',2:'Handoffs: 1',3:'Handoffs: 2',5:'Handoffs: 3',6:'Handoffs: 4',7:['Handoffs: 7','bad']},
+ caps:['Developers finish a “final” version','Handed over to the release team','Released to customers','A customer finds a bug','Reported to a separate support team','Passed to developers or a maintenance team','The fix waits for the next release cycle']});
+
+/* ---------- 3 why devops ---------- */
+S.push({kind:'flip', kick:'DevOps', title:'Why DevOps appeared', sub:'DevOps = Development + Operations. Three things led to it:',
+ cards:[['⚡','Agile created a bottleneck','Development got faster. Releasing didn’t.'],
+        ['📦','Amazon’s service teams','The same team builds and supports each service, and it’s more reliable.'],
+        ['☁️','Software as a service','Runs on the cloud. No media, no downloads.']]});
+
+/* ---------- 4 devops loop (Fig 10.2) ---------- */
+S.push({kind:'diagram', kick:'DevOps · Fig 10.2', title:'DevOps: one team does it all',
+ groups:[[130,280,1020,620,'One DevOps team']],
+ nodes:{dev:[200,350,330,140,'Develop','','👩‍💻'], dep:[750,350,330,140,'Deploy','automated','🚀'], sup:[475,680,330,140,'Support','same people','🎧'],
+        cloud:[1340,350,360,140,'Cloud service','','☁️'], users:[1340,680,360,140,'Customers','','👥']},
+ arrows:[{a:'dev',b:'dep',s:2},{a:'dep',b:'cloud',s:3},{a:'cloud',b:'users',s:3},{a:'users',b:'sup',s:4,c:'orange'},{a:'sup',b:'dev',s:5,via:[[365,750]]}],
+ tokens:[{l:'small change',c:'blue',p:{1:'dev',2:'dep',3:['cloud','users'],4:'sup',5:['dev','dep','cloud','users']},lb:{4:'🐞 issue',5:'🔧 fix'},cl:{4:'red',5:'green'}}],
+ st:{1:{dev:'on'},2:{dev:'',dep:'on'},3:{dep:'',users:'ok'},4:{users:'fail',sup:'warn'},5:{sup:'ok',users:'ok'}},
+ badge:{1:['Handoffs between teams: 0','good']},
+ caps:['One team writes a small change','Deployment is automated','It goes live as a cloud service','Problems come straight back to the team','The same team fixes it fast']});
+
+/* ---------- 5 principles ---------- */
+S.push({kind:'flip', kick:'Table 10.1', title:'DevOps principles',
+ cards:[['👥','Everyone is responsible for everything','Develop, deliver and support together.'],
+        ['🤖','Automate everything you can','Test, deploy, support with minimal manual work.'],
+        ['📊','Measure first, change later','Collect data, then change process and tools.']]});
+
+/* ---------- 6 benefits ---------- */
+S.push({kind:'flip', kick:'Table 10.2', title:'Benefits of DevOps',
+ cards:[['🚀','Faster deployment','Fewer communication delays.'],['🛡️','Reduced risk','Small releases mean fewer failures.'],
+        ['🔧','Faster repair','No hunting for “whose problem”.'],['🙂','More productive teams','Happier people who stay.']]});
+
+/* ---------- 7 code management ---------- */
+S.push({kind:'tiles', kick:'Code management', title:'Why code management?', cols:3,
+ tiles:[['10,000s','lines of code + tests'],['100s','of files'],['dozens','of libraries']],
+ banner:'Code management keeps developers’ changes from interfering with each other'});
+
+/* ---------- 8 Alice & Bob without ---------- */
+const abNodes = (a,b,f)=>({alice:[170,330,330,140,a,'','👩‍💻'], co:[795,300,330,140,'FinanceMadeSimple','personal finance','🏢'],
+  bob:[1420,330,330,140,b,'','🧑‍💻'], file:[760,640,400,150,f,'v1 · 🐞 intermittent bug','📄']});
+S.push({kind:'diagram', kick:'Table 10.3', title:'Alice, Bob and the lost bug fix',
+ nodes:abNodes('Alice','Bob','TaxReturnPreparation'),
+ arrows:[{a:'file',b:'bob',s:2,lab:'copy',off:-26},{a:'alice',b:'file',s:3,both:true,lab:'fix + save',off:0},{a:'bob',b:'file',s:4,c:'orange',off:-40,lab:'overwrite!'}],
+ tokens:[{l:'copy of v1',c:'blue',p:{2:['file','bob'],4:'file',5:null},cl:{4:'red'},lb:{4:'old copy'}},
+         {l:'v1',c:'violet',p:{3:['file','alice','file'],4:null},lb:{3:'fix ✓'},cl:{3:'green'}}],
+ st:{1:{file:'fail'},2:{bob:'on'},3:{bob:'',alice:'ok',file:'ok'},4:{file:'fail',alice:''},5:{co:'warn'},6:{co:'fail'}},
+ subs:{3:{file:'v2 · ✓ fixed',alice:'fixed it ✓'},4:{file:'v3 · 🐞 bug is back',alice:'unaware ✗'},5:{co:'launched with the bug'},6:{co:'fined · customers leave'}},
+ badge:{6:['Company fails','bad']},
+ caps:['The module has an intermittent bug','Bob takes a copy for his UI work','Alice fixes the bug and saves','Bob saves his old copy and the fix is gone','Tests miss it, so the product launches','Users are fined and the company fails']});
+
+/* ---------- 9 Alice & Bob with ---------- */
+S.push({kind:'diagram', kick:'Table 10.3 · replayed', title:'Same story, with code management',
+ nodes:abNodes('Alice’s copy','Bob’s copy','Repository'),
+ arrows:[{a:'file',b:'alice',s:2,off:-14},{a:'file',b:'bob',s:2,off:14},{a:'alice',b:'file',s:3,off:14,lab:'commit v2'},{a:'bob',b:'file',s:4,c:'orange',off:-14,lab:'blocked'}],
+ tokens:[{l:'v1',c:'violet',p:{2:['file','alice'],3:'file',4:null},lb:{3:'fix ✓'},cl:{3:'green'}},
+         {l:'v1',c:'blue',p:{2:['file','bob'],4:'bob',5:'file'},lb:{4:'needs merge',5:'merge ✓'},cl:{4:'red',5:'green'},dy:{4:-95}}],
+ st:{1:{file:'fail'},2:{alice:'on',bob:'on'},3:{alice:'ok',file:'ok'},4:{bob:'warn'},5:{bob:'ok',file:'ok',co:'ok'}},
+ subs:{1:{file:'v1 · 🐞 · tracked'},3:{file:'v2 · ✓ fix (Alice)'},4:{bob:'v2 exists, so merge first'},5:{file:'v3 = fix + UI ✓',bob:'merged ✓',co:'correct release'}},
+ badge:{5:['Nothing lost','good']},
+ caps:['Every version is stored and tracked','Both check out their own copy','Alice commits the fix, creating a new version','Bob can’t overwrite the newer version…','…so he merges, and both changes survive']});
+
+/* ---------- 10 Fig 10.3 ---------- */
+S.push({kind:'diagram', kick:'Fig 10.3', title:'The repository is the heart of DevOps',
+ nodes:{devs:[150,450,320,150,'Developers','','👩‍💻'], repo:[760,420,400,210,'Code management system','shared repository','🗄️'],
+        auto:[1450,250,330,150,'DevOps automation','build · test · deploy','⚙️'], meas:[1450,650,330,150,'DevOps measurement','metrics','📊']},
+ arrows:[{a:'devs',b:'repo',s:1,both:true},{a:'repo',b:'auto',s:2,both:true},{a:'repo',b:'meas',s:3,both:true}],
+ tokens:[{l:'code',c:'blue',p:{1:['devs','repo']}},{l:'scripts · config',c:'teal',p:{2:['repo','auto']},dy:{2:95}},{l:'data',c:'violet',p:{3:['repo','meas']}}],
+ st:{1:{repo:'on'},2:{auto:'ok'},3:{meas:'ok'},4:{repo:'ok'}},
+ caps:['Developers store all project code here','Automation tools use it','Measurement tools use it too','It is essential for “automate everything”']});
+
+/* ---------- 11 fundamentals ---------- */
+S.push({kind:'flip', kick:'Code management fundamentals', title:'Four things it supports',
+ cards:[['⇄','Code transfer','Take code out, work, give it back.'],['🗂','Version storage','Store and retrieve any version.'],
+        ['⑂','Branching and merging','Work in parallel, then merge.'],['ℹ️','Version information','Who, what, when, why.']]});
+
+/* ---------- 12 features ---------- */
+S.push({kind:'flip', kick:'Table 10.4', title:'Features of code management systems',
+ cards:[['🏷️','Version IDs','Every version has a unique ID.'],['📝','Change history','The reason for each change is kept.'],['👥','Independent development','Work on the same file at once. Nothing is overwritten.'],
+        ['📦','Project support','Check out the whole project at once.'],['💾','Storage management','Small differences aren’t stored as full copies.']]});
+
+/* ---------- 13 git clone (Fig 10.5) ---------- */
+S.push({kind:'diagram', kick:'Git · Fig 10.5', title:'Git: everyone has the whole repository',
+ nodes:{repo:[780,270,360,150,'Shared repository','','🗄️'], a:[200,650,360,150,'Alice’s computer','','💻'], b:[780,650,360,150,'Bob’s computer','','💻'], c:[1360,650,360,150,'Carol’s computer','','💻']},
+ arrows:[{a:'repo',b:'a',s:2},{a:'repo',b:'b',s:2},{a:'repo',b:'c',s:2}],
+ tokens:[{l:'full copy',c:'teal',p:{2:['repo','a']},dy:{2:95}},{l:'full copy',c:'teal',p:{2:['repo','b']},dy:{2:95}},{l:'full copy',c:'teal',p:{2:['repo','c']},dy:{2:95}}],
+ st:{1:{repo:'on'},2:{repo:'',a:'ok',b:'ok',c:'ok'}},
+ subs:{1:{repo:'Linus Torvalds · 2005'},2:{a:'git clone',b:'git clone',c:'git clone'}},
+ badge:{3:['💾 storage is cheap','good']},
+ caps:['2005: Linus Torvalds creates Git for Linux','git clone gives every developer the whole repository','Possible because storage became cheap']});
+
+/* ---------- 14 commit push pull (Fig 10.6) ---------- */
+S.push({kind:'diagram', kick:'Fig 10.6', title:'From your laptop to the shared repository',
+ nodes:{sh:[780,250,360,140,'Shared repository','remote','🗄️'], al:[170,470,360,130,'Alice: local repo','','📁'], aw:[170,740,360,130,'Alice: working files','','✏️'],
+        bl:[1390,470,360,130,'Bob: local repo','','📁'], bw:[1390,740,360,130,'Bob: working files','','📄']},
+ arrows:[{a:'sh',b:'al',s:1,lab:'clone',off:-34},{a:'aw',b:'al',s:3,lab:'commit'},{a:'al',b:'sh',s:4,lab:'push',off:-34,c:'teal'},{a:'sh',b:'bl',s:5,lab:'pull'},{a:'bl',b:'bw',s:6}],
+ tokens:[{l:'repo',c:'teal',p:{1:['sh','al'],2:null}},{l:'change',c:'blue',p:{2:'aw',3:'al',4:'sh',5:'bl',6:'bw'},dy:{2:95,6:95}}],
+ st:{1:{al:'on'},2:{al:'',aw:'on'},3:{aw:'',al:'ok'},4:{sh:'ok'},5:{bl:'ok'},6:{bw:'ok'}},
+ subs:{3:{al:'saved locally, offline'},4:{sh:'has Alice’s change'}},
+ caps:['Alice clones the shared repository','She edits her working files','git commit saves it locally (fast, offline)','git push shares it with the team','Bob runs git pull','Bob’s files now include Alice’s change']});
+
+/* ---------- 15 git sandbox ---------- */
+S.push({kind:'custom', kick:'Try it', title:'Git sandbox', fn:'git',
+ hint:'Try: Alice commits and pushes. Bob commits and pushes (rejected). Bob pulls, then pushes. Then 💥 and ♻'});
+
+/* ---------- 16 dvcs benefits ---------- */
+S.push({kind:'flip', kick:'Distributed code management', title:'Why every clone matters',
+ cards:[['🛟','Resilience','Server lost? Restore it from any clone. Work offline too.'],['⚡','Speed','A commit is local, with no network.'],['🧪','Flexibility','Experiment privately before sharing.']]});
+
+/* ---------- 17 branching (Fig 10.7) ---------- */
+const dotN=(cx,cy,t,c,s)=>[cx-38,cy-38,76,76,t,'','',{dot:c,rv:s}];
+S.push({kind:'diagram', kick:'Branching and merging · Fig 10.7', title:'Branches can’t overwrite master: they merge',
+ lanes:[[100,365,'Alice’s branch','var(--violet)'],[100,565,'master','var(--ink)'],[100,765,'Bob’s branch','var(--orange)']],
+ lines:[[380,580,1780,580]],
+ nodes:{v1:dotN(450,580,'v1','ink',1),A1:dotN(680,380,'A1','violet',2),B1:dotN(720,780,'B1','amber',3),A2:dotN(940,380,'A2','violet',4),
+        M1:dotN(1180,580,'M1','teal',5),B2:dotN(1060,780,'B2','amber',6),M2:dotN(1560,580,'M2','teal',7)},
+ arrows:[{a:'v1',b:'A1',s:2,c:'violet'},{a:'v1',b:'B1',s:3,c:'orange'},{a:'A1',b:'A2',s:4,c:'violet'},{a:'A2',b:'M1',s:5},{a:'v1',b:'M1',s:5,c:'ink'},
+         {a:'B1',b:'B2',s:6,c:'orange'},{a:'B2',b:'M1',s:6,c:'orange',dash:true,lab:'✖ overwrite'},{a:'B2',b:'M2',s:7},{a:'M1',b:'M2',s:7,c:'ink'}],
+ st:{5:{M1:'ok'},7:{M2:'ok'}},
+ badge:{5:['master: bug fixed','good'],7:['master: fix + UI','good']},
+ caps:['master holds the shared version','Alice branches to fix the bug','Bob branches to build the UI','Commit as you go, and revert any time','Alice tests, then merges into master','Bob can’t overwrite master…','…he merges, and both changes are kept']});
+
+/* ---------- 18 automation ---------- */
+S.push({kind:'flip', kick:'DevOps automation', title:'Everything that can be automated, should be',
+ cards:[['🔁','Continuous integration','Every commit is built and tested.'],['🧪','Continuous delivery','Tested in a production-like environment.'],
+        ['🚀','Continuous deployment','Every change is released to users.'],['🏗️','Infrastructure as code','Servers are defined in machine-readable models.']]});
+
+/* ---------- 19 system integration ---------- */
+S.push({kind:'tiles', kick:'System integration', title:'What “building the system” means', cols:4,
+ tiles:[['🗄️','Install database + schema'],['📥','Load test data'],['⚙️','Compile files'],['🔗','Link libraries'],
+        ['🌐','Check external services'],['🧹','Move config files'],['✅','Run system tests']],
+ banner:'CI does all of this automatically, on every push'});
+
+/* ---------- 20 CI (Fig 10.9) ---------- */
+S.push({kind:'diagram', kick:'Continuous integration · Fig 10.9', title:'Continuous integration',
+ nodes:{dev:[130,300,320,140,'Developer','','💻'], repo:[560,300,320,140,'Shared repo','','🗄️'], ci:[990,300,320,140,'Integration server','','🖥️'],
+        build:[1420,300,330,140,'Build','compile + link','⚙️'], tests:[1420,650,330,140,'System tests','','🧪'], res:[775,650,370,140,'Results','','📋']},
+ arrows:[{a:'dev',b:'repo',s:1,lab:'push'},{a:'repo',b:'ci',s:2,lab:'notify'},{a:'ci',b:'build',s:3},{a:'build',b:'tests',s:4},{a:'tests',b:'res',s:5},{a:'res',b:'dev',s:5,via:[[290,720]]}],
+ tokens:[{l:'change',c:'blue',p:{1:['dev','repo'],2:'ci',3:'build',4:'tests',5:['res','dev']},lb:{5:'✔ passed'},cl:{5:'green'},dy:{4:95,5:-95}}],
+ st:{1:{dev:'on'},2:{dev:'',ci:'on'},3:{ci:'',build:'ok'},4:{tests:'ok'},5:{res:'ok'}},
+ caps:['A developer pushes a change','The repo notifies the integration server','A new version is built','System tests run','Results come back fast. A failure points at the new code']});
+
+/* ---------- 21 break the build ---------- */
+S.push({kind:'diagram', kick:'Breaking the build · Fig 10.10', title:'Don’t break the build: integrate twice',
+ nodes:{dev:[130,330,320,140,'Developer','','💻'], loc:[560,330,320,140,'Local build + test','your computer','🧪'], repo:[990,330,320,140,'Shared repo','','🗄️'],
+        ci:[1420,330,330,140,'Integration server','','🖥️'], team:[1420,680,330,140,'Whole team','','👥']},
+ arrows:[{a:'dev',b:'repo',s:1,c:'orange',dash:true,via:[[290,270],[1150,270]],lab:'skip local tests'},{a:'repo',b:'ci',s:2},{a:'ci',b:'team',s:3,c:'orange'},
+         {a:'dev',b:'loc',s:5,lab:'#1'},{a:'loc',b:'repo',s:6},{a:'repo',b:'ci',s:6,lab:'#2',off:22}],
+ tokens:[{l:'quick fix',c:'red',p:{1:['dev','repo'],2:'ci',4:null}},{l:'fix',c:'green',p:{4:'dev',5:'loc',6:['repo','ci']}}],
+ st:{2:{ci:'fail'},3:{team:'fail'},4:{dev:'on'},5:{dev:'',loc:'ok'},6:{ci:'ok',team:'ok'}},
+ subs:{2:{ci:'✖ tests failed'},3:{team:'blocked'},6:{ci:'✔ passed',team:'back to work'}},
+ badge:{2:['💥 build broken','bad'],6:['✔ build fixed','good']},
+ caps:['Push without testing locally…','…system tests fail on the server','You broke the build and the whole team is blocked','Your top priority: fix it','Integrate #1: build and test on your computer','Integrate #2: push. CI passes']});
+
+/* ---------- 22 dependency model (Fig 10.11) ---------- */
+S.push({kind:'diagram', kick:'System building · Fig 10.11', title:'Fast builds: rebuild only what changed',
+ nodes:{ss:[300,250,380,130,'System source','','📄'], ts:[1240,250,380,130,'Test source','','📄'], es:[300,480,380,130,'Executable system','object code','⚙️'],
+        et:[1240,480,380,130,'Executable tests','object code','⚙️'], run:[770,720,380,140,'Run system tests','','▶️',{dark:1}]},
+ arrows:[{a:'run',b:'es',s:2,lab:'depends on'},{a:'run',b:'et',s:2},{a:'es',b:'ss',s:3},{a:'et',b:'ts',s:3}],
+ st:{1:{run:'on'},2:{run:'',es:'on',et:'on'},3:{es:'',et:'',ss:'on',ts:'on'},4:{ss:'warn',ts:''},5:{es:'ok',et:'ok',ss:''}},
+ subs:{4:{ss:'✎ changed'},5:{es:'rebuilt',et:'reused ✓'}},
+ badge:{5:['incremental build','good']},
+ caps:['Goal: run the system tests','They need executable code','…which is compiled from source','You change the system source…','…only what depends on it is rebuilt']});
+
+/* ---------- 23 timestamps (Fig 10.12) ---------- */
+S.push({kind:'custom', kick:'Fig 10.12', title:'Recompile or not? Timestamps decide', fn:'build',
+ hint:'Pick a case, guess the result, then press ⚙ Build'});
+
+/* ---------- 24 pipeline (Fig 10.13) ---------- */
+S.push({kind:'diagram', kick:'Continuous delivery and deployment · Fig 10.13', title:'The deployment pipeline',
+ groups:[[120,240,1680,270,'Continuous delivery'],[120,580,1680,290,'Continuous deployment','og']],
+ nodes:{cfg:[190,300,420,150,'Configure test server','replica of production','🧰'], inst:[750,300,420,150,'Install system','on the test server','📦'],
+        acc:[1310,300,420,150,'Acceptance tests','','🧪'], prod:[190,650,420,150,'Install on production','','🌍'],
+        sw:[750,650,420,150,'Switch to new version','','🔀'], users:[1310,650,420,150,'Users','','👥']},
+ arrows:[{a:'cfg',b:'inst',s:2},{a:'inst',b:'acc',s:3},{a:'acc',b:'prod',s:4,via:[[1520,545],[400,545]],lab:'all tests pass'},{a:'prod',b:'sw',s:5,c:'orange'},{a:'sw',b:'users',s:6,c:'orange'}],
+ tokens:[{l:'v2',c:'blue',p:{2:'inst',3:'acc',4:'prod',5:'sw',6:'users'}}],
+ st:{1:{cfg:'on'},2:{cfg:'ok',inst:'on'},3:{inst:'ok',acc:'on'},4:{acc:'ok',prod:'on'},5:{prod:'ok',sw:'on'},6:{sw:'ok',users:'ok'}},
+ subs:{3:{acc:'function ✔ load ✔ perf ✔'}},
+ caps:['Set up a replica of production','Install the tested system on it','Run acceptance tests: function, load, performance','All pass: install on production','Switch operation to the new version','Users get it']});
+
+/* ---------- 25 journey ---------- */
+S.push({kind:'diagram', kick:'Putting it together', title:'The journey of one change',
+ nodes:{dev:[110,290,380,140,'Developer','commit','💻'], loc:[540,290,380,140,'Local build','integrate #1','🧪'], repo:[970,290,380,140,'Shared repo','push','🗄️'],
+        ci:[1420,290,390,140,'CI server','integrate #2','🖥️'], stg:[1420,640,390,140,'Staging','acceptance tests','🧫'], prod:[970,640,380,140,'Production','switch over','🌍'],
+        users:[540,640,380,140,'Users','','👥'], mon:[110,640,380,140,'Monitoring','measure','📊']},
+ arrows:[{a:'dev',b:'loc',s:2},{a:'loc',b:'repo',s:3},{a:'repo',b:'ci',s:4},{a:'ci',b:'stg',s:5},{a:'stg',b:'prod',s:6,c:'orange'},{a:'prod',b:'users',s:7,c:'orange'},{a:'users',b:'mon',s:8},{a:'mon',b:'dev',s:8,dash:true}],
+ tokens:[{l:'change',c:'blue',p:{1:'dev',2:'loc',3:'repo',4:'ci',5:'stg',6:'prod',7:'users',8:['mon','dev']},lb:{8:'insights'},cl:{8:'green'},dy:{5:95,6:95,7:95}}],
+ st:{1:{dev:'on'},2:{dev:'',loc:'ok'},3:{repo:'ok'},4:{ci:'ok'},5:{stg:'ok'},6:{prod:'ok'},7:{users:'ok'},8:{mon:'ok'}},
+ caps:['Commit locally','Build and test locally','Push to the shared repo','CI builds and runs system tests','Acceptance tests in staging','Production switches to the new version','Users get the release','Measure, then improve']});
+
+/* ---------- 26 live switch + A/B ---------- */
+S.push({kind:'custom', kick:'The deployment pipeline · Table 10.6', title:'Switching versions with no downtime', fn:'traffic',
+ hint:'Press 🚀 Deploy v2, then try the A/B tab'});
+
+/* ---------- 27 CD benefits ---------- */
+S.push({kind:'flip', kick:'Table 10.6', title:'Benefits of continuous deployment',
+ cards:[['💰','Reduced costs','Automation pays back fast.'],['🔍','Faster problem solving','Small releases make causes obvious.'],
+        ['💬','Faster feedback','Ship when ready, learn from users.'],['🅰️','A/B testing','Some users get v2, then you measure.']]});
+
+/* ---------- 28 IaC (Fig 10.14) ---------- */
+S.push({kind:'diagram', kick:'Infrastructure as code · Fig 10.14', title:'Infrastructure as code',
+ nodes:{model:[150,440,380,170,'Infrastructure model','versioned in Git','📄'], cm:[740,440,380,170,'CM tool','Puppet · Chef','🤖'],
+        web:[1380,250,380,140,'Web server','','🖥️'], db:[1380,455,380,140,'Database server','','🗄️'], fs:[1380,660,380,140,'File server','','📁']},
+ arrows:[{a:'model',b:'cm',s:2},{a:'cm',b:'web',s:3},{a:'cm',b:'db',s:3},{a:'cm',b:'fs',s:3}],
+ tokens:[{l:'model v1',c:'teal',p:{2:['model','cm']},lb:{4:'model v2',5:'model v1 ↺'},cl:{4:'blue',5:'teal'},p2:1}],
+ st:{1:{model:'on'},2:{model:'',cm:'on'},3:{cm:'',web:'ok',db:'ok',fs:'ok'},4:{web:'warn',db:'warn',fs:'warn'},5:{web:'ok',db:'ok',fs:'ok'}},
+ subs:{1:{model:'v1 · versioned in Git'},3:{web:'nginx · app 1.0',db:'postgres',fs:'nfs'},4:{model:'v2 · app 1.1',web:'nginx · app 1.1 🐞'},5:{model:'v1 restored',web:'nginx · app 1.0'}},
+ badge:{3:['test = production','good'],4:['v2 rolled out everywhere','bad'],5:['rolled back in one step','good']},
+ caps:['Describe your servers in a model','A CM tool reads the model','…and configures every server automatically','Change the model and it rolls out everywhere','Bug? Revert the model and re-apply']});
+
+/* ---------- 29 IaC characteristics ---------- */
+S.push({kind:'flip', kick:'Table 10.7', title:'Why infrastructure as code works', sub:'It keeps test and production identical, and makes rollout and rollback fast.',
+ cards:[['👁️','Visibility','The whole team can read and review it.'],['🔁','Reproducibility','Same steps give the same environment.'],
+        ['✔️','Reliability','No manual mistakes across servers.'],['⏪','Recovery','Revert to a version that worked.']]});
+
+/* ---------- 30 containers ---------- */
+S.push({kind:'diagram', kick:'Containers', title:'Containers: one image, everywhere',
+ nodes:{df:[130,440,360,160,'Dockerfile','infra as code','📄'], img:[680,440,360,160,'Container image','v1','🧊'],
+        test:[1300,240,420,140,'Test system','','🧪'], prod:[1300,460,420,140,'Operational system','','🌍'], nw:[1300,680,420,140,'New container','v2','✨',{rv:5}]},
+ arrows:[{a:'df',b:'img',s:2,lab:'build'},{a:'img',b:'test',s:3},{a:'img',b:'prod',s:4},{a:'img',b:'nw',s:5,c:'orange'}],
+ tokens:[{l:'v1',c:'violet',p:{3:['img','test']}},{l:'v1',c:'violet',p:{4:['img','prod']}},{l:'v2',c:'green',p:{5:['img','nw']}}],
+ st:{1:{df:'on'},2:{df:'',img:'ok'},3:{test:'ok'},4:{prod:'ok'},5:{prod:'dim',nw:'ok'}},
+ subs:{5:{img:'v2 rebuilt'}},
+ badge:{4:['test = production','good']},
+ caps:['A Dockerfile describes the software','Build it into an image','Run the image as a test system','Run the same image in production','Update: start v2 alongside and divert requests']});
+
+/* ---------- 31 measurement ---------- */
+S.push({kind:'flip', kick:'DevOps measurement', title:'Four things to measure',
+ cards:[['⚙️','Process','How you develop, test and deploy.'],['📈','Service','Performance, reliability, acceptability.'],
+        ['👆','Usage','How customers use the product.'],['🏢','Business success','The product’s value to the business.']]});
+
+/* ---------- 32 logging (Fig 10.17) ---------- */
+S.push({kind:'diagram', kick:'Automating measurement · Fig 10.17', title:'Logging and analysis',
+ nodes:{sw:[110,440,360,160,'Executing software','instrumented','💻'], l1:[620,240,260,110,'Log 1','','',{rv:2}], l2:[620,465,260,110,'Log 2','','',{rv:2}], l3:[620,690,260,110,'Log 3','','',{rv:2}],
+        an:[1030,440,330,160,'Log analyser','','🔎',{rv:3}], dash:[1490,440,320,160,'Metrics dashboard','','📊',{rv:4}]},
+ arrows:[{a:'sw',b:'l1',s:2},{a:'sw',b:'l2',s:2},{a:'sw',b:'l3',s:2},{a:'l1',b:'an',s:3},{a:'l2',b:'an',s:3},{a:'l3',b:'an',s:3},{a:'an',b:'dash',s:4}],
+ st:{1:{sw:'on'},2:{sw:''},4:{dash:'ok'}},
+ badge:{5:['people-based data: harder','bad']},
+ caps:['Instrument the software to collect data','It writes logs','A log analyser processes them','Metrics appear on a dashboard','Process data involving people is harder to automate']});
+
+/* ---------- 33 scorecard ---------- */
+S.push({kind:'custom', kick:'Fig 10.15 · DevOps scorecard', title:'Which way should each metric go?', fn:'score',
+ hint:'Pick ▲ ▼ or = for each metric, then press Check'});
+
+/* ---------- 34 quiz ---------- */
+S.push({kind:'custom', kick:'Quick check', title:'Four questions', fn:'quiz', hint:'Click an answer'});
+
+/* ---------- 35 key points ---------- */
+S.push({kind:'tiles', kick:'Key points', title:'What to remember', cols:5, small:1,
+ tiles:[['👥','One team: dev + ops'],['🚀','Fast, safe, quick repair'],['🗄️','Shared repository'],['🌿','Git: everyone has a clone'],['⑂','Branch, then merge'],
+        ['🔁','CI on every commit'],['⚙️','Rebuild only what changed'],['🌍','Deploy every change'],['📄','Infra as code'],['📊','Measure: MTTR, failures, frequency']]});
+
+/* =====================================================================
+   ENGINE
+   ===================================================================== */
+const stage=document.getElementById('stage');
+const el=(t,c,h)=>{const e=document.createElement(t);if(c)e.className=c;if(h!=null)e.innerHTML=h;return e;};
+const NS='http://www.w3.org/2000/svg';
+const sv=(t,a)=>{const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);return e;};
+const COL={teal:'#0E7A6F',orange:'#C2560B',ink:'#14202C',violet:'#5B3FB0',blue:'#1F4FD1',grey:'#9AA3AD'};
+const last=(map,i)=>{let v,has=false;if(!map)return {v,has};Object.keys(map).map(Number).sort((a,b)=>a-b).forEach(k=>{if(k<=i){v=map[k];has=true;}});return {v,has};};
+let GEN=0;
+
+function header(sec,d){
+  if(d.kick)sec.appendChild(el('div','kick',d.kick));
+  if(d.title)sec.appendChild(el('h2','ttl',d.title));
+  if(d.sub)sec.appendChild(el('div','sub-ttl',d.sub));
+}
+function capbar(sec,d,n){
+  const cb=el('div','capbar');cb.innerHTML=`<span class="capnum idle">0/${n}</span><div class="captext hint"></div><div class="sdots">${'<i></i>'.repeat(n)}</div>`;
+  const ol=el('ol','capall');ol.innerHTML=(d.caps||[]).map(c=>`<li>${c}</li>`).join('');cb.appendChild(ol);
+  sec.appendChild(cb);return cb;
+}
+function setCap(cb,i,n,text,hint){
+  if(!cb)return;const num=cb.querySelector('.capnum'),t=cb.querySelector('.captext');
+  num.textContent=`${i}/${n}`;num.classList.toggle('idle',i===0);
+  const html=i===0?(hint||'Click or press → to step through'):text;
+  if(t.innerHTML!==html){t.innerHTML=html;t.className='captext'+(i===0?' hint':'');void t.offsetWidth;t.classList.add('pop');}
+  cb.querySelectorAll('.sdots i').forEach((d,k)=>d.className=k<i-1?'d':k===i-1?'c':'');
+}
+
+/* ---------- diagram ---------- */
+function clipRect(r,p,q){const dx=q[0]-p[0],dy=q[1]-p[1];let t=1e9;
+  if(dx>0)t=Math.min(t,(r.x+r.w-p[0])/dx);if(dx<0)t=Math.min(t,(r.x-p[0])/dx);if(dy>0)t=Math.min(t,(r.y+r.h-p[1])/dy);if(dy<0)t=Math.min(t,(r.y-p[1])/dy);
+  return [p[0]+dx*t,p[1]+dy*t];}
+function edgePt(r,p,q,pad){let pt;if(r.dot){const dx=q[0]-p[0],dy=q[1]-p[1],L=Math.hypot(dx,dy);pt=[p[0]+dx/L*r.w/2,p[1]+dy/L*r.w/2];}else pt=clipRect(r,p,q);
+  const dx=q[0]-p[0],dy=q[1]-p[1],L=Math.hypot(dx,dy);return [pt[0]+dx/L*pad,pt[1]+dy/L*pad];}
+function buildDiagram(sec,d){
+  const R={};const svg=sv('svg',{class:'wires',viewBox:'0 0 1920 1080'});
+  const defs=sv('defs',{});for(const k in COL){const m=sv('marker',{id:'m-'+k+'-'+S.indexOf(d),viewBox:'0 0 10 10',refX:'8',refY:'5',markerWidth:'26',markerHeight:'26',markerUnits:'userSpaceOnUse',orient:'auto-start-reverse'});m.appendChild(sv('path',{d:'M0 0L10 5L0 10z',fill:COL[k]}));defs.appendChild(m);}
+  svg.appendChild(defs);
+  (d.groups||[]).forEach(g=>{const e=el('div','group'+(g[5]?' '+g[5]:''),`<span>${g[4]}</span>`);Object.assign(e.style,{left:g[0]+'px',top:g[1]+'px',width:g[2]+'px',height:g[3]+'px'});sec.appendChild(e);});
+  (d.lanes||[]).forEach(l=>{const e=el('div','lane',l[2]);Object.assign(e.style,{left:l[0]+'px',top:l[1]+'px',color:l[3]});sec.appendChild(e);});
+  (d.lines||[]).forEach(l=>svg.appendChild(sv('line',{x1:l[0],y1:l[1],x2:l[2],y2:l[3],stroke:'#D0C7B4','stroke-width':4,'stroke-dasharray':'10 10'})));
+  sec.appendChild(svg);
+  const nodes={};
+  for(const id in d.nodes){const [x,y,w,h,t,s,ic,o={}]=d.nodes[id];
+    const n=el('div','node'+(o.dot?' dot '+o.dot:'')+(o.dark?' darkn':'')+(o.rv?' rv':''),`${ic?`<div class="ic">${ic}</div>`:''}<div class="t">${t}</div>${o.dot?'':`<div class="s">${s||''}</div>`}`);
+    Object.assign(n.style,{left:x+'px',top:y+'px',width:w+'px',height:h+'px'});sec.appendChild(n);
+    nodes[id]={el:n,x,y,w,h,dot:!!o.dot,rv:o.rv,base:n.className,sub0:s||''};}
+  const arrows=(d.arrows||[]).map(a=>{
+    const A=nodes[a.a],B=nodes[a.b];let ca=[A.x+A.w/2,A.y+A.h/2],cb=[B.x+B.w/2,B.y+B.h/2];
+    if(a.off){const dx=cb[0]-ca[0],dy=cb[1]-ca[1],L=Math.hypot(dx,dy),nx=-dy/L*a.off,ny=dx/L*a.off;ca=[ca[0]+nx,ca[1]+ny];cb=[cb[0]+nx,cb[1]+ny];}
+    const via=a.via||[];const p1=edgePt(A,ca,via[0]||cb,a.both?10:4),p2=edgePt(B,cb,via[via.length-1]||ca,12);
+    const pts=[p1,...via,p2];const dstr='M'+pts.map(p=>p[0].toFixed(1)+' '+p[1].toFixed(1)).join(' L');
+    const c=a.c||'teal';const path=sv('path',{class:'arr',d:dstr,stroke:COL[c]});if(a.dash)path.setAttribute('stroke-dasharray','16 12');
+    svg.appendChild(path);let lab=null;
+    if(a.lab){lab=sv('text',{class:'alab',fill:COL[c],'text-anchor':'middle'});lab.textContent=a.lab;svg.appendChild(lab);}
+    return {...a,path,lab,c,mk:'url(#m-'+c+'-'+S.indexOf(d)+')'};});
+  const toks=(d.tokens||[]).map(t=>{const e=el('div','tok '+(t.c||''),t.l);sec.appendChild(e);return {...t,el:e};});
+  const badge=d.badge?el('div','badge'):null;if(badge){badge.style.opacity=0;sec.appendChild(badge);}
+  const cb=capbar(sec,d,d.caps.length);
+  // label positions after layout
+  requestAnimationFrame(()=>arrows.forEach(a=>{const L=a.path.getTotalLength();a.len=L;if(a.lab){const m=a.path.getPointAtLength(L/2);a.lab.setAttribute('x',m.x);a.lab.setAttribute('y',m.y-16);}}));
+  const tokPos=(t,id,i)=>{const N=nodes[id];const dy=last(t.dy,i).has?last(t.dy,i).v:-(N.h/2+28);return [N.x+N.w/2,N.y+N.h/2+dy];};
+  function place(e,p){e.style.left=p[0]+'px';e.style.top=p[1]+'px';}
+  return {steps:d.caps.length, apply(i,anim){
+    const g=++GEN;
+    for(const id in nodes){const N=nodes[id];if(N.rv)N.el.classList.toggle('shown',i>=N.rv);}
+    // states + subs
+    const st={},sb={};Object.keys(d.st||{}).map(Number).sort((a,b)=>a-b).forEach(k=>{if(k<=i)Object.assign(st,d.st[k]);});
+    Object.keys(d.subs||{}).map(Number).sort((a,b)=>a-b).forEach(k=>{if(k<=i)Object.assign(sb,d.subs[k]);});
+    for(const id in nodes){const N=nodes[id];N.el.className=N.base+(N.rv&&i>=N.rv?' shown':'')+(st[id]?' '+st[id]:'');const s=N.el.querySelector('.s');if(s)s.innerHTML=sb[id]!=null?sb[id]:N.sub0;}
+    // arrows
+    arrows.forEach(a=>{const on=i>=a.s;a.path.classList.toggle('on',on);a.lab&&a.lab.classList.toggle('on',on);
+      a.path.classList.remove('live');a.path.removeAttribute('marker-end');a.path.removeAttribute('marker-start');
+      const L=a.len||a.path.getTotalLength();
+      if(on&&anim&&a.s===i&&!a.dash){a.path.style.transition='none';a.path.style.strokeDasharray=L;a.path.style.strokeDashoffset=L;void a.path.getBoundingClientRect();
+        a.path.style.transition='stroke-dashoffset .6s ease';a.path.style.strokeDashoffset=0;
+        setTimeout(()=>{if(g!==GEN)return;a.path.style.transition='';a.path.style.strokeDasharray='';a.path.style.strokeDashoffset='';a.path.setAttribute('marker-end',a.mk);if(a.both)a.path.setAttribute('marker-start',a.mk);if(a.s===i&&!a.dash)a.path.classList.add('live');},620);}
+      else{a.path.style.strokeDasharray='';a.path.style.strokeDashoffset='';if(on){a.path.setAttribute('marker-end',a.mk);if(a.both)a.path.setAttribute('marker-start',a.mk);if(a.s===i&&!a.dash&&anim!=='print')a.path.classList.add('live');}}});
+    // tokens
+    toks.forEach(t=>{const P=last(t.p,i);const lb=last(t.lb,i),cl=last(t.cl,i);
+      t.el.textContent=lb.has?lb.v:t.l;t.el.className='tok '+(cl.has?cl.v:(t.c||''));
+      if(!P.has||P.v==null){t.el.classList.remove('vis');return;}
+      t.el.classList.add('vis');const keyHere=Object.keys(t.p).map(Number).includes(i);
+      const seq=Array.isArray(P.v)?P.v:[P.v];
+      if(anim&&keyHere&&anim!=='print'){
+        const wasHidden=!t.el.dataset.placed||t.el.dataset.hidden==='1';
+        if(wasHidden){t.el.style.transition='none';place(t.el,tokPos(t,seq[0],i));void t.el.offsetWidth;t.el.style.transition='';}
+        seq.forEach((id,k)=>setTimeout(()=>{if(g!==GEN)return;place(t.el,tokPos(t,id,i));},k*650+(wasHidden?0:0)));
+      } else {t.el.style.transition='none';place(t.el,tokPos(t,seq[seq.length-1],i));void t.el.offsetWidth;t.el.style.transition='';}
+      t.el.dataset.placed=1;});
+    toks.forEach(t=>t.el.dataset.hidden=t.el.classList.contains('vis')?'0':'1');
+    // badge
+    if(badge){const B=last(d.badge,i);if(B.has){const [txt,c]=Array.isArray(B.v)?B.v:[B.v,''];badge.textContent=txt;badge.className='badge '+(c||'');badge.style.opacity=1;}else badge.style.opacity=0;}
+    setCap(cb,i,d.caps.length,d.caps[i-1],d.hint);
+  }};
+}
+
+/* ---------- flip cards ---------- */
+function buildFlip(sec,d){
+  const n=d.cards.length,cols=n<=4?n:3,rows=Math.ceil(n/cols),gap=40,W=(1720-(cols-1)*gap)/cols,H=rows===1?520:300,top=d.sub?300:280;
+  const cards=d.cards.map((c,k)=>{const r=Math.floor(k/cols),col=k%cols;const inRow=Math.min(cols,n-r*cols);const off=(1720-(inRow*W+(inRow-1)*gap))/2;
+    const e=el('div','fc int',`<div class="in"><div class="f"><div class="ic">${c[0]}</div><div class="t">${c[1]}</div><div class="h">click to reveal</div></div><div class="b"><div class="t">${c[1]}</div><div class="d">${c[2]}</div></div></div>`);
+    Object.assign(e.style,{left:(100+off+col*(W+gap))+'px',top:(top+r*(H+gap))+'px',width:W+'px',height:H+'px'});
+    e.addEventListener('click',ev=>{ev.stopPropagation();e.classList.toggle('open');});sec.appendChild(e);return e;});
+  const caps=d.cards.map(c=>c[1]+': '+c[2]);const cb=capbar(sec,{caps},n);
+  return {steps:n,apply(i){cards.forEach((c,k)=>c.classList.toggle('open',k<i));setCap(cb,i,n,caps[i-1],'Guess first, then click a card or press →');}};
+}
+/* ---------- tiles ---------- */
+function buildTiles(sec,d){
+  const n=d.tiles.length,cols=d.cols,rows=Math.ceil(n/cols),gap=32,W=(1720-(cols-1)*gap)/cols,H=d.small?230:(rows===1?340:230),top=280;
+  const tiles=d.tiles.map((t,k)=>{const r=Math.floor(k/cols),c=k%cols;const inRow=Math.min(cols,n-r*cols);const off=(1720-(inRow*W+(inRow-1)*gap))/2;
+    const big=/^[0-9d]/.test(t[0])&&t[0].length>2;
+    const e=el('div','tile rv',big?`<div class="big">${t[0]}</div><div class="t">${t[1]}</div>`:`<div class="ic">${t[0]}</div><div class="t">${t[1]}</div>`);
+    Object.assign(e.style,{left:(100+off+c*(W+gap))+'px',top:(top+r*(H+gap))+'px',width:W+'px',height:H+'px'});sec.appendChild(e);return e;});
+  let ban=null;if(d.banner){ban=el('div','banner rv',d.banner);sec.appendChild(ban);}
+  const steps=n+(ban?1:0);const caps=d.tiles.map(t=>t[0].length>3&&/^[0-9d]/.test(t[0])?t[0]+' '+t[1]:t[1]);if(ban)caps.push(d.banner);
+  const cb=capbar(sec,{caps},steps);
+  return {steps,apply(i){tiles.forEach((t,k)=>t.classList.toggle('shown',k<i));if(ban)ban.classList.toggle('shown',i>n);setCap(cb,i,steps,caps[i-1]);}};
+}
+/* ---------- cover ---------- */
+function buildCover(sec){
+  sec.classList.add('dark');
+  sec.innerHTML=`<div style="position:absolute;left:120px;top:250px;font-family:var(--mono);font-size:28px;letter-spacing:.14em;color:#8FD3C7">CHAPTER 10 · ENGINEERING SOFTWARE PRODUCTS</div>
+  <h1 style="position:absolute;left:120px;top:310px;margin:0;font-size:130px;line-height:1.02;color:#F6F3EC;font-weight:800;letter-spacing:-.02em">DevOps and<br>Code Management</h1>
+  <div style="position:absolute;left:120px;top:640px;font-size:36px;color:#BFD0CC">From the developer’s laptop to production</div>
+  <div style="position:absolute;left:120px;top:900px;font-family:var(--mono);font-size:26px;color:#8FA3A0">Click, → or Space to advance · ← to go back · F for fullscreen</div>`;
+  const svg=`<svg viewBox="0 0 400 230" style="position:absolute;right:120px;top:300px;width:560px"><path d="M200 115 C 150 25, 40 25, 40 115 C 40 205, 150 205, 200 115" fill="none" stroke="#0E7A6F" stroke-width="24" stroke-linecap="round"/><path d="M200 115 C 250 25, 360 25, 360 115 C 360 205, 250 205, 200 115" fill="none" stroke="#3B6FE0" stroke-width="24" stroke-linecap="round"/><circle r="9" fill="#F6F3EC"><animateMotion dur="5s" repeatCount="indefinite" path="M200 115 C 150 25, 40 25, 40 115 C 40 205, 150 205, 200 115 C 250 25, 360 25, 360 115 C 360 205, 250 205, 200 115"/></circle><text x="96" y="122" fill="#fff" font-size="18" font-weight="700" font-family="monospace">DEV</text><text x="276" y="122" fill="#fff" font-size="18" font-weight="700" font-family="monospace">OPS</text></svg>`;
+  sec.insertAdjacentHTML('beforeend',svg);
+  return {steps:0,apply(){}};
+}
+
+/* ---------- custom: git ---------- */
+const CUSTOM={};
+CUSTOM.git=(sec,d)=>{
+  const W=540,xs=[100,690,1280];let S2,n;
+  const box={};
+  [['alice','👩‍💻 Alice’s clone'],['origin','🗄️ Shared repository'],['bob','🧑‍💻 Bob’s clone']].forEach(([k,t],i)=>{
+    const acts=k==='origin'?`<button class="btn or" data-g="attack">💥 Attack</button><button class="btn tl" data-g="restore">♻ Restore</button>`:
+      `<button class="btn" data-g="commit" data-w="${k}">＋ Commit</button><button class="btn pri" data-g="push" data-w="${k}">⬆ Push</button><button class="btn" data-g="pull" data-w="${k}">⬇ Pull</button>`;
+    const e=el('div','repo int',`<h4>${t}</h4><div class="chain"></div><div class="acts">${acts}</div>`);
+    Object.assign(e.style,{left:xs[i]+'px',top:'280px',width:W+'px',height:'460px'});sec.appendChild(e);box[k]=e;});
+  const log=el('div','glog');sec.appendChild(log);
+  const L=(c,t)=>{const l=el('div',c,t);log.appendChild(l);while(log.children.length>3)log.firstChild.remove();};
+  const isP=(p,a)=>p.length<=a.length&&p.every((x,i)=>a[i]===x);
+  const chip=id=>`<span class="chip ${id==='c0'?'c0':id[0]}">${id}</span>`;
+  function draw(){for(const k in box){const ch=box[k].querySelector('.chain');if(S2[k]===null){ch.outerHTML='<div class="chain dead">💥 destroyed</div>';continue;}
+    const c=box[k].querySelector('.chain');c.className='chain';c.innerHTML=S2[k].map(chip).join('');}}
+  function fl(k,bad){const b=box[k];b.classList.remove('flash','err');void b.offsetWidth;b.classList.add(bad?'err':'flash');setTimeout(()=>b.classList.remove('flash','err'),800);}
+  function fly(a,b,t){const A=box[a],B=box[b];const c=el('span','chip M fly',t);c.style.left=(A.offsetLeft+W/2-40)+'px';c.style.top='500px';sec.appendChild(c);
+    requestAnimationFrame(()=>requestAnimationFrame(()=>{c.style.left=(B.offsetLeft+W/2-40)+'px';}));return new Promise(r=>setTimeout(()=>{c.remove();r();},650));}
+  const nm=w=>w==='alice'?'Alice':'Bob';
+  function reset(){S2={alice:['c0'],bob:['c0'],origin:['c0']};n={A:0,B:0,M:0};log.innerHTML='';L('','# Both developers have cloned the repository');draw();}
+  sec.addEventListener('click',async e=>{const b=e.target.closest('[data-g]');if(!b)return;e.stopPropagation();const g=b.dataset.g,w=b.dataset.w;
+    if(g==='commit'){const k=w==='alice'?'A':'B';S2[w].push(k+(++n[k]));draw();fl(w);L('',`${nm(w)}: commit → saved locally`);}
+    if(g==='push'){if(!S2.origin)return fl(w,1),L('r','✖ server is down: restore it first');
+      if(isP(S2.origin,S2[w])){await fly(w,'origin','push');S2.origin=S2[w].slice();draw();fl('origin');L('g',`✔ ${nm(w)} pushed`);}
+      else{fl(w,1);L('r',`✖ ${nm(w)}’s push rejected: pull and merge first`);}}
+    if(g==='pull'){if(!S2.origin)return fl(w,1),L('r','✖ server is down');
+      if(isP(S2[w],S2.origin)){await fly('origin',w,'pull');S2[w]=S2.origin.slice();draw();fl(w);L('g',`✔ ${nm(w)} is up to date`);}
+      else if(isP(S2.origin,S2[w]))L('',`${nm(w)} is ahead, so push`);
+      else{await fly('origin',w,'merge');const mine=S2[w].filter(c=>!S2.origin.includes(c));S2[w]=S2.origin.concat(mine,['M'+(++n.M)]);draw();fl(w);L('g',`✔ ${nm(w)} merged. Now push`);}}
+    if(g==='attack'&&S2.origin){S2.origin=null;draw();fl('origin',1);L('r','💥 Shared repository destroyed. Clones still hold everything');}
+    if(g==='restore'&&!S2.origin){const s=S2.alice.length>=S2.bob.length?'alice':'bob';await fly(s,'origin','restore');S2.origin=S2[s].slice();draw();fl('origin');L('g',`♻ Restored from ${nm(s)}’s clone`);}
+  });
+  reset();const cb=capbar(sec,{caps:[]},0);setCap(cb,0,0,'',d.hint);
+  return {steps:0,apply(){},reset};
+};
+
+/* ---------- custom: build timestamps ---------- */
+CUSTOM.build=(sec,d)=>{
+  const ids=[['src','Mycode (source)'],['lib1','Lib 1'],['lib2','Lib 2'],['cls','Classdef (compiled)'],['obj','Mycode (compiled)']];
+  let F,t;const fmt=m=>`${String(9+Math.floor(m/60)).padStart(2,'0')}:${String(m%60).padStart(2,'0')}`;
+  const els={};
+  ids.forEach(([k,n],i)=>{const e=el('div','file int',`<div class="n">${n}</div><div class="ts"></div>${k!=='obj'?'<button class="btn ed" data-ed="'+k+'">✎</button>':''}`);
+    const x=k==='obj'?760:100+i*440;const y=k==='obj'?560:300;Object.assign(e.style,{left:x+'px',top:y+'px',width:(k==='obj'?400:400)+'px'});
+    if(k==='obj'){e.style.background='var(--ink)';e.style.color='#fff';}sec.appendChild(e);els[k]=e;});
+  const svg=sv('svg',{class:'wires',viewBox:'0 0 1920 1080'});[[300],[740],[1180],[1620]].forEach(([x])=>svg.appendChild(sv('line',{x1:x,y1:470,x2:960,y2:556,stroke:'#C3B9A4','stroke-width':4,'stroke-dasharray':'10 10'})));
+  sec.insertBefore(svg,sec.firstChild.nextSibling);
+  const lab=el('div','',`<span style="font-family:var(--mono);font-size:24px;color:var(--muted)">↑ depends on all of these</span>`);Object.assign(lab.style,{position:'absolute',left:'1180px',top:'600px'});sec.appendChild(lab);
+  const ctr=el('div','int');Object.assign(ctr.style,{position:'absolute',left:'100px',top:'700px',display:'flex',gap:'14px'});
+  ctr.innerHTML=`<button class="btn" data-case="1">Case 1</button><button class="btn" data-case="2">Case 2: source edited</button><button class="btn" data-case="3">Case 3: Classdef changed</button><button class="btn pri" data-run>⚙ Build</button>`;
+  sec.appendChild(ctr);
+  const v=el('div','verdict','');v.style.top='790px';sec.appendChild(v);
+  function setCase(k){t=40;F={src:5,lib1:0,lib2:2,cls:8,obj:20};if(k==2)F.src=30;if(k==3)F.cls=32;draw();v.className='verdict';v.textContent=`Case ${k}: will Mycode be recompiled?`;}
+  function draw(cls={}){for(const k in els){els[k].querySelector('.ts').textContent=fmt(F[k]);els[k].className='file int '+(cls[k]||'');}}
+  sec.addEventListener('click',e=>{const c=e.target.closest('[data-case]'),r=e.target.closest('[data-run]'),ed=e.target.closest('[data-ed]');if(!c&&!r&&!ed)return;e.stopPropagation();
+    if(c)setCase(+c.dataset.case);
+    if(ed){t++;F[ed.dataset.ed]=t;draw({[ed.dataset.ed]:'new'});v.className='verdict';v.textContent='File changed. Press ⚙ Build';}
+    if(r){const newer=['src','lib1','lib2','cls'].filter(k=>F[k]>F.obj);const cls={};['src','lib1','lib2','cls'].forEach(k=>cls[k]=F[k]>F.obj?'new':'old');
+      if(!newer.length){draw(cls);v.className='verdict ok';v.textContent='✔ Compiled code is newest, so nothing to do';}
+      else{t++;F.obj=t;cls.obj='re';draw(cls);v.className='verdict re';v.textContent=`⚙ Recompile: ${newer.map(k=>ids.find(x=>x[0]===k)[1]).join(', ')} is newer`;}}});
+  setCase(1);const cb=capbar(sec,{caps:[]},0);setCap(cb,0,0,'',d.hint);
+  return {steps:0,apply(){}};
+};
+
+/* ---------- custom: traffic ---------- */
+CUSTOM.traffic=(sec,d)=>{
+  const svg=sv('svg',{class:'wires',viewBox:'0 0 1920 1080'});svg.style.pointerEvents='none';sec.appendChild(svg);
+  const LB={x:820,y:560},U={x:220,y:560},SV=[0,1,2,3].map(i=>({x:1400,y:300+i*175}));
+  const mk=(t,a,tx)=>{const e=sv(t,a);if(tx!=null)e.textContent=tx;svg.appendChild(e);return e;};
+  mk('line',{x1:300,y1:560,x2:720,y2:560,stroke:'#C3B9A4','stroke-width':4,'stroke-dasharray':'10 10'});
+  SV.forEach(s=>mk('line',{x1:920,y1:560,x2:s.x,y2:s.y,stroke:'#C3B9A4','stroke-width':4,'stroke-dasharray':'10 10'}));
+  mk('rect',{x:120,y:480,width:200,height:160,rx:24,fill:'#FFFDF8',stroke:'#CFC6B3','stroke-width':3});mk('text',{x:220,y:550,'text-anchor':'middle','font-size':48},'👥');mk('text',{x:220,y:605,'text-anchor':'middle','font-size':30,'font-weight':700,'font-family':'sans-serif'},'Users');
+  mk('rect',{x:720,y:480,width:200,height:160,rx:24,fill:'#14202C'});mk('text',{x:820,y:552,'text-anchor':'middle','font-size':30,'font-weight':700,fill:'#fff','font-family':'sans-serif'},'Load');mk('text',{x:820,y:590,'text-anchor':'middle','font-size':30,'font-weight':700,fill:'#fff','font-family':'sans-serif'},'balancer');
+  const lbl=mk('text',{x:820,y:680,'text-anchor':'middle','font-size':26,'font-family':'monospace',fill:'#556170'},'');
+  const srv=SV.map((s,i)=>{const r=mk('rect',{x:s.x,y:s.y-60,width:380,height:120,rx:20,fill:'#FFFDF8',stroke:'#CFC6B3','stroke-width':3});const t=mk('text',{x:s.x+30,y:s.y+12,'font-size':30,'font-weight':700,'font-family':'sans-serif'},'🖥 server '+(i+1));const v=mk('text',{x:s.x+320,y:s.y+12,'font-size':34,'font-weight':800,'font-family':'monospace','text-anchor':'middle'},'');return {r,v};});
+  const cnt=mk('text',{x:120,y:430,'font-size':28,'font-family':'monospace',fill:'#556170'},'');
+  const ctr=el('div','int');Object.assign(ctr.style,{position:'absolute',left:'100px',top:'250px',display:'flex',gap:'14px',alignItems:'center',fontSize:'26px'});sec.appendChild(ctr);
+  const msg=el('div','');Object.assign(msg.style,{position:'absolute',left:'100px',top:'850px',width:'1720px',fontSize:'34px',fontWeight:'700',textAlign:'center'});sec.appendChild(msg);
+  let mode='switch',dots=[],phase='run',ver=[1,1,1,1],ab=30,counts={1:0,2:0},spawnT=0,lastT=0,active=false;
+  const paint=()=>{srv.forEach((e,i)=>{const v2=ver[i]===2;e.v.textContent='v'+ver[i];e.r.setAttribute('stroke',v2?'#5B3FB0':'#CFC6B3');e.r.setAttribute('fill',v2?'#F1ECFC':'#FFFDF8');e.v.setAttribute('fill',v2?'#5B3FB0':'#14202C');});
+    lbl.textContent=phase==='run'?'routing ▶':phase==='hold'?'⏸ holding new requests':'⏸ v1 finishing work…';lbl.setAttribute('fill',phase==='run'?'#556170':'#C2560B');
+    cnt.textContent=mode==='ab'?`→ v1: ${counts[1]}    → v2: ${counts[2]}`:'';};
+  function ctrls(){ctr.innerHTML=mode==='switch'?`<button class="btn ${mode==='switch'?'pri':''}" data-m="switch">Zero-downtime</button><button class="btn" data-m="ab">A/B testing</button><span style="width:30px"></span><button class="btn or" data-t="deploy" ${ver[0]===2||phase!=='run'?'disabled':''}>🚀 Deploy v2</button><button class="btn" data-t="reset">↺ Reset</button>`
+    :`<button class="btn" data-m="switch">Zero-downtime</button><button class="btn pri" data-m="ab">A/B testing</button><span style="width:30px"></span>Send <input type="range" min="0" max="100" value="${ab}" data-ab style="width:280px;accent-color:#5B3FB0"> <b data-abv>${ab}%</b>&nbsp;to v2`;}
+  function setMode(m){mode=m;phase='run';counts={1:0,2:0};ver=m==='ab'?[1,1,2,2]:[1,1,1,1];dots.forEach(d=>d.c.remove());dots=[];ctrls();paint();msg.textContent=m==='ab'?'Some users get v2. Measure how they use it.':'All servers run v1';msg.style.color='#14202C';}
+  ctr.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;e.stopPropagation();
+    if(b.dataset.m)setMode(b.dataset.m);
+    if(b.dataset.t==='reset')setMode('switch');
+    if(b.dataset.t==='deploy'){phase='hold';paint();ctrls();msg.textContent='1. Stop new requests';msg.style.color='#C2560B';
+      setTimeout(()=>{if(phase==='hold'){phase='drain';paint();msg.textContent='2. v1 finishes its outstanding transactions';}},1300);}});
+  ctr.addEventListener('input',e=>{if(e.target.dataset.ab!=null){ab=+e.target.value;ctr.querySelector('[data-abv]').textContent=ab+'%';}});
+  ctr.addEventListener('pointerdown',e=>e.stopPropagation());
+  const pick=()=>{if(mode==='ab'){const v2=Math.random()*100<ab;const pool=[0,1,2,3].filter(i=>ver[i]===(v2?2:1));return pool[Math.floor(Math.random()*pool.length)];}return Math.floor(Math.random()*4);};
+  function tick(ts){requestAnimationFrame(tick);if(!active){lastT=ts;return;}const dt=Math.min(50,ts-(lastT||ts));lastT=ts;spawnT+=dt;
+    if(spawnT>240){spawnT=0;const c=sv('circle',{r:12,cx:320,cy:560,fill:'#1F4FD1'});svg.appendChild(c);dots.push({c,x:320,y:560,st:'in'});}
+    let q=0;const sp=.55*dt;
+    dots.forEach(o=>{
+      if(o.st==='in'){o.x+=sp;if(o.x>=700){if(phase!=='run')o.st='q';else{o.st='out';o.t=pick();o.x=920;o.c.setAttribute('fill',ver[o.t]===2?'#5B3FB0':'#1F4FD1');}}}
+      else if(o.st==='q'){q++;o.x=690-((q-1)%8)*28;o.y=520-Math.floor((q-1)/8)*28;if(phase==='run'){o.st='out';o.t=pick();o.x=920;o.y=560;o.c.setAttribute('fill',ver[o.t]===2?'#5B3FB0':'#1F4FD1');}}
+      else if(o.st==='out'){const s=SV[o.t];const dx=s.x-o.x,dy=s.y-o.y,L=Math.hypot(dx,dy);if(L<sp){o.st='p';o.life=0;o.x=s.x+40+Math.random()*200;}else{o.x+=dx/L*sp;o.y+=dy/L*sp;}}
+      else if(o.st==='p'){o.life+=dt;o.c.setAttribute('opacity',Math.max(.1,1-o.life/700));if(o.life>700){o.st='x';if(mode==='ab')counts[ver[o.t]]++;}}
+      o.c.setAttribute('cx',o.x);o.c.setAttribute('cy',o.y);});
+    dots=dots.filter(o=>o.st==='x'?(o.c.remove(),false):true);
+    if(phase==='drain'&&!dots.some(o=>o.st==='out'||o.st==='p')){ver=[2,2,2,2];phase='run';paint();ctrls();msg.textContent='3. Switch to v2 and resume. No request lost ✔';msg.style.color='#18803D';}
+    if(mode==='ab')paint();}
+  requestAnimationFrame(tick);setMode('switch');
+  const cb=capbar(sec,{caps:[]},0);setCap(cb,0,0,'',d.hint);
+  return {steps:0,apply(){},enter(){active=true;},leave(){active=false;},print(){dots.forEach(o=>o.c.remove());dots=[];}};
+};
+
+/* ---------- custom: scorecard ---------- */
+CUSTOM.score=(sec,d)=>{
+  const M=[['Process',[['Deployment frequency','up'],['Failed deployments %','down'],['Mean time to recovery','down'],['Lead time to deploy','down'],['Changed code shipped','up']]],
+           ['Service',[['Availability','eq'],['Performance','eq'],['Customer complaints','down'],['New customers','up']]]];
+  const sym={up:'▲',down:'▼',eq:'='};
+  M.forEach(([g,rows],gi)=>{const c=el('div','int');Object.assign(c.style,{position:'absolute',left:(100+gi*890)+'px',top:'260px',width:'830px'});
+    c.innerHTML=`<div style="font-family:var(--mono);font-size:26px;color:var(--teal);font-weight:700;letter-spacing:.1em;margin-bottom:6px">${g.toUpperCase()} METRICS</div>`+
+      rows.map(([m,a])=>`<div class="mrow" data-a="${a}"><span>${m}</span><span class="pick">${['up','down','eq'].map(o=>`<button data-o="${o}">${sym[o]}</button>`).join('')}</span></div>`).join('');sec.appendChild(c);});
+  const bar=el('div','int');Object.assign(bar.style,{position:'absolute',left:'100px',top:'840px',display:'flex',gap:'16px',alignItems:'center',fontSize:'32px',fontWeight:'700'});
+  bar.innerHTML=`<button class="btn pri" data-chk>Check</button><button class="btn" data-show>Show answers</button><span data-res></span>`;sec.appendChild(bar);
+  sec.addEventListener('click',e=>{const o=e.target.closest('[data-o]'),ck=e.target.closest('[data-chk]'),sh=e.target.closest('[data-show]');if(!o&&!ck&&!sh)return;e.stopPropagation();
+    if(o){const r=o.closest('.mrow');r.querySelectorAll('button').forEach(b=>b.className='');o.classList.add('sel');}
+    if(ck||sh){let ok=0,tot=0;sec.querySelectorAll('.mrow').forEach(r=>{tot++;const a=r.dataset.a,s=r.querySelector('.sel,.right,.wrong');r.querySelectorAll('button').forEach(b=>b.className='');
+      const p=sh?a:(s&&s.dataset.o);if(p){if(p===a)ok++;r.querySelector(`[data-o=${p}]`).classList.add(p===a?'right':'wrong');if(p!==a)r.querySelector(`[data-o=${a}]`).classList.add('right');}});
+      sec.querySelector('[data-res]').textContent=sh?'= means stable or improving':`${ok} / ${tot} correct`;}});
+  const cb=capbar(sec,{caps:[]},0);setCap(cb,0,0,'',d.hint);
+  return {steps:0,apply(){},print(){sec.querySelector('[data-show]').click();}};
+};
+
+/* ---------- custom: quiz ---------- */
+CUSTOM.quiz=(sec,d)=>{
+  const Q=[['What went wrong for Alice and Bob?',['Tests were slow','Bob’s save overwrote Alice’s fix','Git was down'],1],
+           ['Why is a Git commit fast?',['It’s local, with no network','It skips history','It compresses files'],0],
+           ['“Integrate twice” means…',['Run CI twice','Test locally, then push to CI','Merge twice'],1],
+           ['Infrastructure as code gives you…',['Manual flexibility','Identical, reproducible environments','Faster laptops'],1]];
+  Q.forEach(([q,o,a],k)=>{const c=el('div','qcard int',`<h4>${k+1}. ${q}</h4>`+o.map((x,j)=>`<button class="o" data-j="${j}">${x}</button>`).join(''));
+    Object.assign(c.style,{left:(100+(k%2)*880)+'px',top:(260+Math.floor(k/2)*330)+'px',width:'840px'});c.dataset.a=a;sec.appendChild(c);});
+  sec.addEventListener('click',e=>{const b=e.target.closest('.o');if(!b)return;e.stopPropagation();const c=b.closest('.qcard');if(c.dataset.done)return;c.dataset.done=1;
+    const a=+c.dataset.a;c.querySelectorAll('.o').forEach((x,j)=>{x.disabled=true;if(j===a)x.classList.add('right');});if(+b.dataset.j!==a)b.classList.add('wrong');});
+  const cb=capbar(sec,{caps:[]},0);setCap(cb,0,0,'',d.hint);
+  return {steps:0,apply(){},print(){sec.querySelectorAll('.qcard').forEach(c=>{c.querySelectorAll('.o')[+c.dataset.a].classList.add('right');});}};
+};
+
+/* ---------- build all ---------- */
+const SL=S.map((d,k)=>{const sec=el('section','slide');sec.id='s'+(k+1);stage.appendChild(sec);
+  if(d.kind!=='cover')header(sec,d);
+  const api=d.kind==='cover'?buildCover(sec):d.kind==='diagram'?buildDiagram(sec,d):d.kind==='flip'?buildFlip(sec,d):d.kind==='tiles'?buildTiles(sec,d):CUSTOM[d.fn](sec,d);
+  return {sec,api,d};});
+
+/* ---------- navigation ---------- */
+let cur=0,step=0;
+function show(k,s,anim){
+  const prev=cur;cur=Math.max(0,Math.min(SL.length-1,k));step=s;
+  SL.forEach((x,i)=>{x.sec.classList.toggle('cur',i===cur);x.sec.classList.toggle('past',i<cur);});
+  if(prev!==cur){SL[prev].api.leave&&SL[prev].api.leave();}
+  const A=SL[cur].api;A.enter&&A.enter();
+  if(!anim){SL[cur].sec.classList.add('instant');A.apply(step,false);void SL[cur].sec.offsetWidth;SL[cur].sec.classList.remove('instant');}
+  else A.apply(step,true);
+  document.getElementById('ct').textContent=`slide ${cur+1} / ${SL.length}`+(A.steps?` · step ${step}/${A.steps}`:'');
+  document.getElementById('bar').style.width=(100*(cur+ (A.steps?step/A.steps:1))/SL.length)+'%';
+  try{history.replaceState(null,'','#slide-'+(cur+1));}catch(e){}
+}
+function next(){const A=SL[cur].api;if(step<A.steps)show(cur,step+1,true);else if(cur<SL.length-1)show(cur+1,0,false);}
+function prev(){if(step>0)show(cur,step-1,false);else if(cur>0)show(cur-1,SL[cur-1].api.steps,false);}
+addEventListener('keydown',e=>{if(e.target.tagName==='INPUT')return;
+  if(['ArrowRight',' ','PageDown','Enter','ArrowDown'].includes(e.key)){e.preventDefault();next();}
+  if(['ArrowLeft','PageUp','Backspace','ArrowUp'].includes(e.key)){e.preventDefault();prev();}
+  if(e.key==='Home')show(0,0,false);if(e.key==='End')show(SL.length-1,0,false);
+  if(e.key==='f'||e.key==='F')full();});
+stage.addEventListener('click',e=>{if(e.target.closest('.int,button,input'))return;next();});
+let tx=null;stage.addEventListener('touchstart',e=>{tx=e.touches[0].clientX;},{passive:true});
+stage.addEventListener('touchend',e=>{if(tx==null)return;const dx=e.changedTouches[0].clientX-tx;if(Math.abs(dx)>50){dx<0?next():prev();}tx=null;});
+document.getElementById('bNext').onclick=next;document.getElementById('bPrev').onclick=prev;
+function full(){const d=document.documentElement;try{if(!document.fullscreenElement)d.requestFullscreen().catch(()=>toast('Fullscreen is blocked here. Use your browser’s fullscreen (F11).'));else document.exitFullscreen();}catch(e){toast('Fullscreen is blocked here.');}}
+document.getElementById('bFull').onclick=full;
+function toast(t){const e=document.getElementById('toast');e.innerHTML=t;e.style.display='block';clearTimeout(e._t);e._t=setTimeout(()=>e.style.display='none',6000);}
+function fit(){const s=Math.min(innerWidth/1920,innerHeight/1080);stage.style.transform=`translate(-50%,-50%) scale(${s})`;}
+addEventListener('resize',fit);fit();
+
+/* ---------- print ---------- */
+window.preparePrint=function(){SL.forEach(x=>{x.sec.classList.add('instant');x.api.apply(x.api.steps,'print');x.api.print&&x.api.print();x.sec.querySelectorAll('.fc').forEach(f=>f.classList.add('open'));});};
+document.getElementById('bPdf').onclick=()=>{preparePrint();const t0=Date.now();try{print();}catch(e){}if(Date.now()-t0<400)toast('This viewer blocks printing. Open the page in its own tab and press Ctrl/⌘+P → Save as PDF, or use the PDF file provided.');setTimeout(()=>location.reload(),600);};
+addEventListener('beforeprint',()=>preparePrint());
+
+const m=location.hash.match(/slide-(\d+)/);show(m?+m[1]-1:0,0,false);
+</script>
+</body>
+</html>
